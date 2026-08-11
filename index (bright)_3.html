@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XRD data reviewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDEBE4;
+  --panel:#FFFFFF;
+  --panel-hi:#F4F2EC;
+  --line:#D6D2C6;
+  --line-2:#B7B1A3;
+  --text:#22262B;
+  --text-dim:#6B7178;
+  --paper:#FFFFFF;
+  --paper-line:#DFDBD0;
+  --exp:#C62A22;
+  --sim:#7A8087;
+  --accent:#1F5FA9;
+  --accent-hi:#17497F;
+  --ok:#1E7A4E;
+  --match:#C51D9B;
+  --bad:#C62A22;
+  --r:4px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.012) 0 1px, transparent 1px 3px),
+    var(--bg);
+  color:var(--text);
+  font-family:"IBM Plex Sans",system-ui,"Malgun Gothic",sans-serif;
+  font-size:13px;line-height:1.5;
+  padding:14px;
+}
+h1,h2,h3{margin:0;font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:700;letter-spacing:.01em}
+.mono{font-family:"IBM Plex Mono",monospace}
+
+/* ---- header ---- */
+.topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:stretch;margin-bottom:14px}
+.brand{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px 16px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-left:3px solid var(--exp);
+}
+.brand h1{font-size:20px}
+.brand .sub{color:var(--text-dim);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase}
+.provenance{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px 16px;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--text-dim);
+  max-width:360px;
+}
+.provenance b{color:var(--text);font-weight:600}
+
+/* ---- layout ---- */
+.app{display:grid;grid-template-columns:280px minmax(0,1fr) 296px;gap:14px;align-items:start}
+.col-mid{display:grid;gap:14px;grid-template-rows:auto auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-width:0;
+  box-shadow:0 1px 2px rgba(35,30,20,.05)}
+.panel > header{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel-hi);
+  border-radius:var(--r) var(--r) 0 0;
+}
+.panel > header h2{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text)}
+.panel > header .note{font-size:10.5px;color:var(--text-dim);letter-spacing:.04em}
+.panel .body{padding:12px;display:flex;flex-direction:column;gap:12px}
+.panel .body.scroll{max-height:74vh;overflow:auto}
+
+/* ---- controls ---- */
+.field{display:flex;flex-direction:column;gap:5px}
+.field > label,.grouplabel{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)
+}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+input[type=text],input[type=number],input[type=password],select,textarea{
+  background:#FCFBF8;color:var(--text);border:1px solid var(--line-2);border-radius:3px;
+  padding:6px 8px;font-family:"IBM Plex Mono",monospace;font-size:12px;width:100%;
+}
+input:disabled,select:disabled,textarea:disabled{background:#F1EFE9;color:#9A9FA5}
+textarea{font-family:"IBM Plex Sans",sans-serif;resize:vertical;line-height:1.45}
+input:focus,select:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=color]{padding:0;height:26px;width:34px;border:1px solid var(--line-2);background:#FFF;border-radius:3px;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+button{
+  font-family:"IBM Plex Sans",sans-serif;font-size:12px;font-weight:500;
+  background:#F4F2EC;color:var(--text);border:1px solid var(--line-2);
+  border-radius:3px;padding:7px 11px;cursor:pointer;transition:background .12s,border-color .12s
+}
+button:hover:not(:disabled){background:#E8E5DC;border-color:#9C968A}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:600}
+button.primary:hover:not(:disabled){background:var(--accent-hi);border-color:var(--accent-hi)}
+button.danger{border-color:#D8A9A5;color:#A32219;background:#FCF3F2}
+button.danger:hover:not(:disabled){background:#F7E4E2;border-color:#C4837D}
+button.tiny{padding:3px 7px;font-size:11px}
+.check{display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:12px;line-height:1.4}
+.check input{margin:2px 0 0 0;accent-color:var(--accent);flex:none}
+.filebtn{position:relative;overflow:hidden;display:inline-block;width:100%}
+.filebtn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+hr.sep{border:0;border-top:1px solid var(--line);margin:2px 0}
+.hint{font-size:11px;color:var(--text-dim);line-height:1.45}
+a{color:var(--accent)}
+
+/* ---- swatches ---- */
+.swatches{display:flex;gap:4px;flex-wrap:wrap}
+.sw{width:16px;height:16px;border-radius:2px;border:1px solid rgba(0,0,0,.25);cursor:pointer;padding:0}
+.sw:hover{transform:scale(1.12)}
+
+/* ---- trace list ---- */
+.trace{border:1px solid var(--line);border-radius:3px;background:#FBFAF6}
+.trace .head{display:flex;align-items:center;gap:7px;padding:6px 8px}
+.trace .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.trace .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.trace .kind{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.08em;color:var(--text-dim);border:1px solid var(--line-2);padding:1px 4px;border-radius:2px}
+.trace .ctl{display:none;gap:6px;align-items:center;padding:0 8px 8px;flex-wrap:wrap}
+.trace.open .ctl{display:flex}
+.trace .ctl input[type=text]{font-size:11px;padding:4px 6px;width:auto;flex:1;min-width:82px}
+
+/* ---- plot ---- */
+.plotwrap{padding:12px}
+.canvas-shell{background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:6px;position:relative}
+canvas{display:block;width:100%;height:520px}
+.readout{
+  position:absolute;top:12px;left:14px;font-family:"IBM Plex Mono",monospace;font-size:11px;
+  color:#33373C;background:rgba(255,255,255,.9);padding:2px 6px;border:1px solid var(--line);border-radius:2px;pointer-events:none
+}
+.plotbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px 0}
+.pickbox{margin-top:10px}
+.pickhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+table.picks{width:100%;border-collapse:collapse;font-family:"IBM Plex Mono",monospace;font-size:11px}
+table.picks th,table.picks td{border-bottom:1px solid var(--line);padding:3px 6px;text-align:right}
+table.picks th:first-child,table.picks td:first-child{text-align:left}
+table.picks th{color:var(--text-dim);font-weight:500;letter-spacing:.06em}
+table.picks td.sel{color:var(--match)}
+
+/* ---- lamp / status ---- */
+.lamp{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--text-dim)}
+.lamp i{width:7px;height:7px;border-radius:50%;background:#C3BFB4;display:block}
+.lamp.on i{background:var(--ok)}
+.lamp.warn i{background:#C98A12}
+.statusline{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--text-dim);min-height:16px}
+.statusline.err{color:#A32219}
+
+/* ---- comment ---- */
+.comment-out{
+  background:#FBFAF6;border:1px solid var(--line);border-radius:3px;padding:12px 14px;
+  white-space:pre-wrap;font-size:12.5px;line-height:1.65;max-height:340px;overflow:auto;color:#1E2126
+}
+.comment-out:empty{display:none}
+details{border:1px solid var(--line);border-radius:3px;background:#FBFAF6}
+summary{cursor:pointer;padding:7px 10px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+details pre{margin:0;padding:0 10px 10px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:#4C5157;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto}
+table.match{width:100%;border-collapse:collapse;font-family:"IBM Plex Mono",monospace;font-size:10.5px;table-layout:fixed}
+table.match th,table.match td{border-bottom:1px solid var(--line);padding:2px 3px;text-align:right;overflow:hidden}
+table.match th:first-child,table.match td:first-child{text-align:left}
+table.match th{color:var(--text-dim);font-weight:500;letter-spacing:.06em}
+td.hit{color:var(--match)}td.miss{color:var(--bad)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font-family:"IBM Plex Mono",monospace;font-size:11px;margin-bottom:8px}
+.kv span{color:var(--text-dim)}
+.kv b{font-weight:500;color:var(--text)}
+
+@media (max-width:1180px){
+  .app{grid-template-columns:1fr}
+  .panel .body.scroll{max-height:none}
+  canvas{height:420px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <h1>XRD data reviewer</h1>
+    <span class="sub">experimental pattern &nbsp;vs&nbsp; CIF simulation</span>
+  </div>
+  <div class="provenance">
+    <span class="lamp warn"><i></i></span>
+    <span>이 페이지의 코드는 <b>Claude</b>로 생성되었습니다. 계산 결과는 사용자가 검증한 뒤 사용하십시오.</span>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ============ LEFT : parameters ============ -->
+  <section class="panel">
+    <header><h2>Parameters</h2><span class="note" id="privLamp">세션 메모리</span></header>
+    <div class="body scroll">
+
+      <div class="field">
+        <label>실험 raw data 불러오기</label>
+        <span class="filebtn"><button type="button">파일 선택 (.xy .txt .csv .dat .xrdml)</button>
+          <input type="file" id="fExp" accept=".xy,.txt,.csv,.dat,.asc,.xrdml,.xml" multiple></span>
+        <span class="hint">새 파일을 불러오면 이전 데이터와 comment는 즉시 폐기됩니다.</span>
+      </div>
+
+      <div class="field">
+        <label>CIF 불러오기 (시뮬레이션)</label>
+        <span class="filebtn"><button type="button">파일 선택 (.cif)</button>
+          <input type="file" id="fCif" accept=".cif,.txt" multiple></span>
+      </div>
+
+      <div class="statusline" id="loadStatus"></div>
+      <hr class="sep">
+
+      <div class="field">
+        <label>2 theta 범위 (deg)</label>
+        <div class="row">
+          <input type="number" id="tthMin" value="3" step="0.5" min="0.5" max="160">
+          <span class="hint">to</span>
+          <input type="number" id="tthMax" value="50" step="0.5" min="1" max="170">
+        </div>
+        <span class="hint">모든 그래프에 동일하게 적용됩니다.</span>
+      </div>
+
+      <label class="check"><input type="checkbox" id="cbNorm" checked>
+        <span>Normalize (구간 내 최대값 1로 규격화)</span></label>
+      <span class="hint" id="normHint">해제 시 실험 데이터는 raw counts, 시뮬레이션은 실험 최대값에 맞춰 표시됩니다.</span>
+
+      <div class="field">
+        <label>y 축 범위</label>
+        <label class="check"><input type="checkbox" id="cbYAuto" checked><span>자동</span></label>
+        <div class="row">
+          <input type="number" id="yMin" value="0" step="0.1" disabled>
+          <span class="hint">to</span>
+          <input type="number" id="yMax" value="1" step="0.1" disabled>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Stack offset <span class="mono" id="offVal">35%</span></label>
+        <input type="range" id="rOff" min="0" max="100" value="35" step="5">
+      </div>
+
+      <hr class="sep">
+      <div class="grouplabel">Data list &nbsp;/&nbsp; color</div>
+      <div id="traceList" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="hint" id="emptyHint">불러온 데이터가 없습니다.</div>
+
+      <hr class="sep">
+      <div class="grouplabel">Simulation</div>
+      <div class="field">
+        <label>Wavelength (Å)</label>
+        <div class="row">
+          <select id="selWave">
+            <option value="1.540598">Cu Ka1 &nbsp;1.540598</option>
+            <option value="1.541874">Cu Ka &nbsp;1.541874</option>
+            <option value="1.788965">Co Ka1 &nbsp;1.788965</option>
+            <option value="1.936042">Fe Ka1 &nbsp;1.936042</option>
+            <option value="0.709300">Mo Ka1 &nbsp;0.709300</option>
+            <option value="custom">직접 입력</option>
+          </select>
+          <input type="number" id="waveCustom" value="1.540598" step="0.000001" style="display:none">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field grow"><label>FWHM (deg)</label><input type="number" id="fwhm" value="0.12" step="0.01" min="0.01"></div>
+        <div class="field grow"><label>Lorentz 비율 eta</label><input type="number" id="eta" value="0.5" step="0.05" min="0" max="1"></div>
+      </div>
+      <div class="field"><label>Overall B (Å²), CIF에 U가 없을 때</label><input type="number" id="bIso" value="1.0" step="0.5" min="0"></div>
+      <label class="check"><input type="checkbox" id="cbLP" checked><span>Lorentz polarization 보정 적용</span></label>
+      <label class="check"><input type="checkbox" id="cbTicks" checked><span>Bragg 위치 tick 표시</span></label>
+      <button type="button" id="btnSim">시뮬레이션 다시 계산</button>
+      <div class="statusline" id="simStatus"></div>
+
+      <hr class="sep">
+      <div class="grouplabel">Peak match</div>
+      <div class="row">
+        <div class="field grow"><label>허용 오차 (deg)</label><input type="number" id="tolMatch" value="0.30" step="0.05" min="0.05"></div>
+        <div class="field grow"><label>비교 peak 수</label><input type="number" id="nMatch" value="10" step="1" min="3" max="25"></div>
+      </div>
+      <div id="matchBox"></div>
+
+      <hr class="sep">
+      <button type="button" class="danger" id="btnPurge">지금 모든 데이터 폐기</button>
+      <span class="hint">파일, 계산 결과, comment, API key를 브라우저 메모리에서 지웁니다. 이 페이지는 어떤 값도 저장하지 않습니다.</span>
+    </div>
+  </section>
+
+  <!-- ============ MIDDLE : plot + comment ============ -->
+  <div class="col-mid">
+
+    <section class="panel">
+      <header><h2>XRD spectra</h2><span class="note">stacked line graph &nbsp;/&nbsp; 실험 raw data 대 CIF simulation</span></header>
+      <div class="plotbar">
+        <button type="button" class="tiny" id="btnPng">PNG 저장</button>
+        <button type="button" class="tiny" id="btnCsv">시뮬레이션 CSV 저장</button>
+        <span class="lamp" id="plotLamp"><i></i><span id="plotLampTxt">데이터 없음</span></span>
+      </div>
+      <div class="plotwrap">
+        <div class="canvas-shell">
+          <canvas id="plot"></canvas>
+          <div class="readout" id="readout"></div>
+        </div>
+        <div class="pickbox">
+          <div class="pickhead">
+            <span class="grouplabel">선택한 실험 peak</span>
+            <button type="button" class="tiny" id="btnPickClear">선택 해제</button>
+            <span class="hint">그래프 위쪽의 실험 peak 막대를 클릭하면 선택되고 FWHM이 계산됩니다.</span>
+          </div>
+          <div id="pickBox"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2>Comment</h2><span class="note">Claude API key 사용</span></header>
+      <div class="body">
+        <label class="check"><input type="checkbox" id="cbApi">
+          <span>Claude API를 사용합니다. 아래 요약값이 Anthropic 서버로 전송되는 것에 동의합니다.</span></label>
+        <div class="row wrap">
+          <div class="field grow" style="min-width:200px"><label>API key (메모리에만 보관)</label>
+            <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" disabled></div>
+          <div class="field" style="min-width:180px"><label>Model</label>
+            <select id="apiModel" disabled>
+              <option value="claude-sonnet-5">claude-sonnet-5</option>
+              <option value="claude-opus-5">claude-opus-5</option>
+              <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001</option>
+            </select></div>
+        </div>
+        <div class="field"><label>합성 조건 메모 (선택, 전송됨)</label>
+          <textarea id="memo" rows="2" placeholder="예 : Zn(NO3)2 6H2O 0.30 mmol, H2BDC 0.30 mmol, DMF 10 mL, 120 C, 24 h, solvothermal" disabled></textarea></div>
+        <details><summary>전송되는 내용 미리보기</summary><pre id="payloadPre">데이터를 불러오면 표시됩니다.</pre></details>
+        <div class="row">
+          <button type="button" class="primary" id="btnComment" disabled>Comment 생성</button>
+          <button type="button" class="tiny" id="btnClearComment">comment 지우기</button>
+        </div>
+        <div class="statusline" id="apiStatus"></div>
+        <div class="comment-out" id="commentOut"></div>
+        <span class="hint">raw 데이터 전체는 전송되지 않습니다. 위 미리보기에 있는 peak 목록과 격자 정보, 메모만 전송됩니다.</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ RIGHT : CCDC ============ -->
+  <section class="panel">
+    <header><h2>CCDC</h2><span class="note">Access Structures</span></header>
+    <div class="body">
+      <span class="hint">CIF는 CCDC에서 직접 내려받아 왼쪽 패널에 올리십시오. 아래 검색은 새 탭에서 열립니다.</span>
+      <div class="field"><label>CCDC number</label><input type="text" id="ccdcId" placeholder="예 : 256965"></div>
+      <div class="field"><label>Compound name</label><input type="text" id="ccdcName" placeholder="예 : MOF-5"></div>
+      <div class="field"><label>DOI</label><input type="text" id="ccdcDoi" placeholder="10.1021/..."></div>
+      <div class="field"><label>Authors</label><input type="text" id="ccdcAuth" placeholder="Yaghi"></div>
+      <div class="field"><label>Database</label>
+        <select id="ccdcDb">
+          <option value="Published">Entire published collection</option>
+          <option value="CSD">CSD</option>
+          <option value="ICSD">ICSD</option>
+        </select></div>
+      <button type="button" class="primary" id="btnCcdc">Access Structures에서 검색</button>
+      <button type="button" id="btnCcdcHome">검색 페이지 그대로 열기</button>
+      <hr class="sep">
+      <span class="hint">CCDC 사이트는 외부 페이지 안에 끼워 넣는 것을 허용하지 않으므로 새 탭으로 연결합니다. 질의 파라미터 중 확인된 것은 Ccdcid와 DatabaseToSearch이며 나머지 항목은 사이트 동작에 따라 무시될 수 있습니다.</span>
+      <hr class="sep">
+      <div class="grouplabel">불러온 CIF 정보</div>
+      <div id="cifInfo" class="hint">없음</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const SCAT={"H":[1,0.202,30.868,0.244,8.544,0.082,1.273,0,0],"He":[2,0.091,18.183,0.181,6.212,0.11,1.803,0.036,0.284],"Li":[3,1.611,107.638,1.246,30.48,0.326,4.533,0.099,0.495],"Be":[4,1.25,60.804,1.334,18.591,0.36,3.653,0.106,0.416],"B":[5,0.945,46.444,1.312,14.178,0.419,3.223,0.116,0.377],"C":[6,0.731,36.995,1.195,11.297,0.456,2.814,0.125,0.346],"N":[7,0.572,28.847,1.043,9.054,0.465,2.421,0.131,0.317],"O":[8,0.455,23.78,0.917,7.622,0.472,2.144,0.138,0.296],"F":[9,0.387,20.239,0.811,6.609,0.475,1.931,0.146,0.279],"Ne":[10,0.303,17.64,0.72,5.86,0.475,1.762,0.153,0.266],"Na":[11,2.241,108.004,1.333,24.505,0.907,3.391,0.286,0.435],"Mg":[12,2.268,73.67,1.803,20.175,0.839,3.013,0.289,0.405],"Al":[13,2.276,72.322,2.428,19.773,0.858,3.08,0.317,0.408],"Si":[14,2.129,57.775,2.533,16.476,0.835,2.88,0.322,0.386],"P":[15,1.888,44.876,2.469,13.538,0.805,2.642,0.32,0.361],"S":[16,1.659,36.65,2.386,11.488,0.79,2.469,0.321,0.34],"Cl":[17,1.452,30.935,2.292,9.98,0.787,2.234,0.322,0.323],"Ar":[18,1.274,26.682,2.19,8.813,0.793,2.219,0.326,0.307],"K":[19,3.951,137.075,2.545,22.402,1.98,4.532,0.482,0.434],"Ca":[20,4.47,99.523,2.971,22.696,1.97,4.195,0.482,0.417],"Sc":[21,3.966,88.96,2.917,20.606,1.925,3.856,0.48,0.399],"Ti":[22,3.565,81.982,2.818,19.049,1.893,3.59,0.483,0.386],"V":[23,3.245,76.379,2.698,17.726,1.86,3.363,0.486,0.374],"Cr":[24,2.307,78.405,2.334,15.785,1.823,3.157,0.49,0.364],"Mn":[25,2.747,67.786,2.456,15.674,1.792,3.0,0.498,0.357],"Fe":[26,2.544,64.424,2.343,14.88,1.759,2.854,0.506,0.35],"Co":[27,2.367,61.431,2.236,14.18,1.724,2.725,0.515,0.344],"Ni":[28,2.21,58.727,2.134,13.553,1.689,2.609,0.524,0.339],"Cu":[29,1.579,62.94,1.82,12.453,1.658,2.504,0.532,0.333],"Zn":[30,1.942,54.162,1.95,12.518,1.619,2.416,0.543,0.33],"Ga":[31,2.321,65.602,2.486,15.458,1.688,2.581,0.599,0.351],"Ge":[32,2.447,55.893,2.702,14.393,1.616,2.446,0.601,0.342],"As":[33,2.399,45.718,2.79,12.817,1.529,2.28,0.594,0.328],"Se":[34,2.298,38.83,2.854,11.536,1.456,2.146,0.59,0.316],"Br":[35,2.166,33.899,2.904,10.497,1.395,2.041,0.589,0.307],"Kr":[36,2.034,29.999,2.927,9.598,1.342,1.952,0.589,0.299],"Rb":[37,4.776,140.782,3.859,18.991,2.234,3.701,0.868,0.419],"Sr":[38,5.848,104.972,4.003,19.367,2.342,3.737,0.88,0.414],"Y":[39,4.129,27.548,3.012,5.088,1.179,0.591,0,0],"Zr":[40,4.105,28.492,3.144,5.277,1.229,0.601,0,0],"Nb":[41,4.237,27.415,3.105,5.074,1.234,0.593,0,0],"Mo":[42,3.12,72.464,3.906,14.642,2.361,3.237,0.85,0.366],"Tc":[43,4.318,28.246,3.27,5.148,1.287,0.59,0,0],"Ru":[44,4.358,27.881,3.298,5.179,1.323,0.594,0,0],"Rh":[45,4.431,27.911,3.343,5.153,1.345,0.592,0,0],"Pd":[46,4.436,28.67,3.454,5.269,1.383,0.595,0,0],"Ag":[47,2.036,61.497,3.272,11.824,2.511,2.846,0.837,0.327],"Cd":[48,2.574,55.675,3.259,11.838,2.547,2.784,0.838,0.322],"In":[49,3.153,66.649,3.557,14.449,2.818,2.976,0.884,0.335],"Sn":[50,3.45,59.104,3.735,14.179,2.118,2.855,0.877,0.327],"Sb":[51,3.564,50.487,3.844,13.316,2.687,2.691,0.864,0.316],"Te":[52,4.785,27.999,3.688,5.083,1.5,0.581,0,0],"I":[53,3.473,39.441,4.06,11.816,2.522,2.415,0.84,0.298],"Xe":[54,3.366,35.509,4.147,11.117,2.443,2.294,0.829,0.289],"Cs":[55,6.062,155.837,5.986,19.695,3.303,3.335,1.096,0.379],"Ba":[56,7.821,117.657,6.004,18.778,3.28,3.263,1.103,0.376],"La":[57,4.94,28.716,3.968,5.245,1.663,0.594,0,0],"Ce":[58,5.007,28.283,3.98,5.183,1.678,0.589,0,0],"Pr":[59,5.085,28.588,4.043,5.143,1.684,0.581,0,0],"Nd":[60,5.151,28.304,4.075,5.073,1.683,0.571,0,0],"Pm":[61,5.201,28.079,4.094,5.081,1.719,0.576,0,0],"Sm":[62,5.255,28.016,4.113,5.037,1.743,0.577,0,0],"Eu":[63,6.267,100.298,4.844,16.066,3.202,2.98,1.2,0.367],"Gd":[64,5.225,29.158,4.314,5.259,1.827,0.586,0,0],"Tb":[65,5.272,29.046,4.347,5.226,1.844,0.585,0,0],"Dy":[66,5.332,28.888,4.37,5.198,1.863,0.581,0,0],"Ho":[67,5.376,28.773,4.403,5.174,1.884,0.582,0,0],"Er":[68,5.436,28.655,4.437,5.117,1.891,0.577,0,0],"Tm":[69,5.441,29.149,4.51,5.264,1.956,0.59,0,0],"Yb":[70,5.529,28.927,4.533,5.144,1.945,0.578,0,0],"Lu":[71,5.553,28.907,4.58,5.16,1.969,0.577,0,0],"Hf":[72,5.588,29.001,4.619,5.164,1.997,0.579,0,0],"Ta":[73,5.659,28.807,4.63,5.114,2.014,0.578,0,0],"W":[74,5.709,28.782,4.677,5.084,2.019,0.572,0,0],"Re":[75,5.695,28.968,4.74,5.156,2.064,0.575,0,0],"Os":[76,5.75,28.933,4.773,5.139,2.079,0.573,0,0],"Ir":[77,5.754,29.159,4.851,5.152,2.096,0.57,0,0],"Pt":[78,5.803,29.016,4.87,5.15,2.127,0.572,0,0],"Au":[79,2.388,42.866,4.226,9.743,2.689,2.264,1.255,0.307],"Hg":[80,2.682,42.822,4.241,9.856,2.755,2.295,1.27,0.307],"Tl":[81,5.932,29.086,4.972,5.126,2.195,0.572,0,0],"Pb":[82,3.51,52.914,4.552,11.884,3.154,2.571,1.359,0.321],"Bi":[83,3.841,50.261,4.679,11.999,3.192,2.56,1.363,0.318],"Po":[84,6.07,28.075,4.997,4.999,2.232,0.563,0,0],"At":[85,6.133,28.047,5.031,4.957,2.239,0.558,0,0],"Rn":[86,4.078,38.406,4.978,11.02,3.096,2.355,1.326,0.299],"Fr":[87,6.201,28.2,5.121,4.954,2.275,0.556,0,0],"Ra":[88,6.215,28.382,5.17,5.002,2.316,0.562,0,0],"Ac":[89,6.278,28.323,5.195,4.949,2.321,0.557,0,0],"Th":[90,6.264,28.651,5.263,5.03,2.367,0.563,0,0],"Pa":[91,6.306,28.688,5.303,5.026,2.386,0.561,0,0],"U":[92,6.767,85.951,6.729,15.642,4.014,2.936,1.561,0.335],"Np":[93,6.323,29.142,5.414,5.096,2.453,0.568,0,0],"Pu":[94,6.415,28.836,5.419,5.022,2.449,0.561,0,0],"Am":[95,6.378,29.156,5.495,5.102,2.495,0.565,0,0],"Cm":[96,6.46,28.396,5.469,4.97,2.471,0.554,0,0],"Bk":[97,6.502,28.375,5.478,4.975,2.51,0.561,0,0],"Cf":[98,6.548,28.461,5.526,4.965,2.52,0.557,0,0]};
+/* =====================================================================
+   XRD data reviewer  core
+   scattering factor  f(s) = Z - 41.78214 * s^2 * sum a_i exp(-b_i s^2)
+   s = sin(theta)/lambda = 1/(2d)
+   table  International Tables for Crystallography Vol C, table 6.1.1.4
+   (values taken from pymatgen atomic_scattering_params.json)
+   ===================================================================== */
+
+const PALETTE = ["#C62A22","#7A8087","#1F5FA9","#1E7A4E","#B0700F","#6B3FA0","#22262B","#A82B57"];
+
+function num(v){
+  if(v==null) return NaN;
+  const s = String(v).replace(/\(.*?\)/g,"").trim();
+  if(s===""||s==="."||s==="?") return NaN;
+  const f = parseFloat(s);
+  return isFinite(f)? f : NaN;
+}
+
+/* ---------------- CIF tokenizer + parser ---------------- */
+function cifLineTokens(line){
+  const out=[]; let j=0;
+  while(j<line.length){
+    const c=line[j];
+    if(c===" "||c==="\t"){ j++; continue; }
+    if(c==="#") break;
+    if(c==="'"||c==='"'){
+      const q=c; let k=j+1,s="";
+      while(k<line.length){
+        if(line[k]===q && (k+1>=line.length || /\s/.test(line[k+1]))) break;
+        s+=line[k]; k++;
+      }
+      out.push({v:s,q:true}); j=k+1;
+    }else{
+      let k=j,s="";
+      while(k<line.length && !/\s/.test(line[k])){ s+=line[k]; k++; }
+      out.push({v:s,q:false}); j=k;
+    }
+  }
+  return out;
+}
+
+function parseCIF(text){
+  const lines = text.split(/\r\n|\r|\n/);
+  const toks=[];
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    if(line.startsWith(";")){
+      let s=line.slice(1); i++;
+      while(i<lines.length && !lines[i].startsWith(";")){ s+="\n"+lines[i]; i++; }
+      toks.push({v:s.trim(),q:true});
+      continue;
+    }
+    for(const t of cifLineTokens(line)) toks.push(t);
+  }
+  const blocks=[]; let cur=null, pend=null, mode="normal", lt=null, lv=null;
+  const flush=()=>{
+    if(lt && lt.length && lv && lv.length){
+      const n=lt.length, rows=[];
+      for(let i=0;i+n<=lv.length;i+=n) rows.push(lv.slice(i,i+n));
+      cur.loops.push({tags:lt, rows});
+    }
+    lt=null; lv=null; if(mode!=="normal") mode="normal";
+  };
+  const newBlock=(name)=>{ cur={name, items:{}, loops:[]}; blocks.push(cur); };
+  for(const t of toks){
+    const v=t.v;
+    if(!t.q && /^data_/i.test(v)){ if(cur) flush(); newBlock(v.slice(5)); pend=null; continue; }
+    if(!cur) newBlock("");
+    if(!t.q && /^(loop_|global_)$/i.test(v)){ flush(); if(/^loop_$/i.test(v)){ lt=[]; lv=[]; mode="lt"; } continue; }
+    if(!t.q && v.startsWith("_")){
+      if(mode==="lt"){ lt.push(v.toLowerCase()); continue; }
+      flush(); pend=v.toLowerCase(); continue;
+    }
+    if(mode==="lt"){ mode="lv"; }
+    if(mode==="lv"){ lv.push(v); continue; }
+    if(pend){ cur.items[pend]=v; pend=null; }
+  }
+  if(cur) flush();
+  return blocks;
+}
+
+function loopWith(block, tag){
+  for(const lp of block.loops) if(lp.tags.includes(tag)) return lp;
+  return null;
+}
+function colOf(lp, tag){ return lp? lp.tags.indexOf(tag) : -1; }
+
+/* ---------------- symmetry ---------------- */
+function parseSymComp(s){
+  s = s.toLowerCase().replace(/\s/g,"");
+  const o=[0,0,0,0];
+  let i=0;
+  while(i<s.length){
+    let sign=1;
+    if(s[i]==="+"){ i++; }
+    else if(s[i]==="-"){ sign=-1; i++; }
+    let ns="";
+    while(i<s.length && /[0-9.]/.test(s[i])){ ns+=s[i]; i++; }
+    let c = ns==="" ? 1 : parseFloat(ns);
+    if(s[i]==="/"){ i++; let d=""; while(i<s.length && /[0-9.]/.test(s[i])){ d+=s[i]; i++; } const dv=parseFloat(d); if(dv) c/=dv; }
+    if(s[i]==="*") i++;
+    if(i<s.length && /[xyz]/.test(s[i])){ o[{x:0,y:1,z:2}[s[i]]] += sign*c; i++; }
+    else o[3] += sign*c;
+  }
+  return o;
+}
+function parseSymOp(str){
+  const parts = str.split(",");
+  if(parts.length!==3) return null;
+  return parts.map(parseSymComp);
+}
+
+/* ---------------- structure from CIF ---------------- */
+function elementOf(sym, label){
+  const clean = (s)=> (s||"").replace(/[^A-Za-z]/g,"");
+  let c = clean(sym) || clean(label);
+  if(!c) return null;
+  if(c[0]==="D"||c[0]==="d") return "H";
+  let two = c[0].toUpperCase() + (c[1]? c[1].toLowerCase() : "");
+  if(two.length===2 && SCAT[two]) return two;
+  const one = c[0].toUpperCase();
+  if(SCAT[one]) return one;
+  if(SCAT[two]) return two;
+  return null;
+}
+
+function structureFromCIF(text){
+  const blocks = parseCIF(text).filter(b=> b.loops.length || Object.keys(b.items).length);
+  if(!blocks.length) throw new Error("CIF 내용을 읽지 못했습니다.");
+  let block = blocks.find(b=> loopWith(b,"_atom_site_fract_x")) || blocks[0];
+  const it = block.items;
+  const cell = {
+    a:num(it["_cell_length_a"]), b:num(it["_cell_length_b"]), c:num(it["_cell_length_c"]),
+    al:num(it["_cell_angle_alpha"]), be:num(it["_cell_angle_beta"]), ga:num(it["_cell_angle_gamma"])
+  };
+  if(!isFinite(cell.a)||!isFinite(cell.b)||!isFinite(cell.c)||!isFinite(cell.al)||!isFinite(cell.be)||!isFinite(cell.ga))
+    throw new Error("격자 상수를 찾지 못했습니다.");
+
+  let ops=[];
+  const symLoop = loopWith(block,"_symmetry_equiv_pos_as_xyz") || loopWith(block,"_space_group_symop_operation_xyz");
+  if(symLoop){
+    const ci = colOf(symLoop,"_symmetry_equiv_pos_as_xyz")>=0 ? colOf(symLoop,"_symmetry_equiv_pos_as_xyz") : colOf(symLoop,"_space_group_symop_operation_xyz");
+    for(const r of symLoop.rows){
+      const op = parseSymOp(String(r[ci]).replace(/^['"]|['"]$/g,""));
+      if(op) ops.push(op);
+    }
+  }
+  let symWarn = "";
+  if(!ops.length){ ops=[[[1,0,0,0],[0,1,0,0],[0,0,1,0]]]; symWarn = "대칭 연산자 loop가 없어 P1로 처리했습니다."; }
+
+  const alp = loopWith(block,"_atom_site_fract_x");
+  if(!alp) throw new Error("_atom_site_fract_x loop를 찾지 못했습니다.");
+  const ix=colOf(alp,"_atom_site_fract_x"), iy=colOf(alp,"_atom_site_fract_y"), iz=colOf(alp,"_atom_site_fract_z");
+  const isym=colOf(alp,"_atom_site_type_symbol"), ilab=colOf(alp,"_atom_site_label");
+  const iocc=colOf(alp,"_atom_site_occupancy");
+  const iu=colOf(alp,"_atom_site_u_iso_or_equiv"), ib=colOf(alp,"_atom_site_b_iso_or_equiv");
+
+  const sites=[]; const unknown=new Set();
+  for(const r of alp.rows){
+    const x=num(r[ix]), y=num(r[iy]), z=num(r[iz]);
+    if(!isFinite(x)||!isFinite(y)||!isFinite(z)) continue;
+    const el = elementOf(isym>=0? r[isym]:null, ilab>=0? r[ilab]:null);
+    if(!el){ unknown.add(String(ilab>=0?r[ilab]:r[isym])); continue; }
+    let occ = iocc>=0? num(r[iocc]) : 1; if(!isFinite(occ)) occ=1;
+    let B = NaN;
+    if(iu>=0){ const u=num(r[iu]); if(isFinite(u)) B = 8*Math.PI*Math.PI*u; }
+    if(!isFinite(B) && ib>=0){ const b=num(r[ib]); if(isFinite(b)) B=b; }
+    sites.push({el,x,y,z,occ,B, label: ilab>=0? String(r[ilab]) : el});
+  }
+  if(!sites.length) throw new Error("원자 좌표를 읽지 못했습니다.");
+
+  /* expand */
+  const wrap=(v)=>{ let w=v%1; if(w<0)w+=1; if(w>0.9999995||w<5e-7) w=0; return w; };
+  const atoms=[]; const seen=new Set();
+  for(const s of sites){
+    for(const op of ops){
+      const x=wrap(op[0][0]*s.x+op[0][1]*s.y+op[0][2]*s.z+op[0][3]);
+      const y=wrap(op[1][0]*s.x+op[1][1]*s.y+op[1][2]*s.z+op[1][3]);
+      const z=wrap(op[2][0]*s.x+op[2][1]*s.y+op[2][2]*s.z+op[2][3]);
+      const key = s.el+"|"+Math.round(x*2000)+"|"+Math.round(y*2000)+"|"+Math.round(z*2000);
+      if(seen.has(key)) continue;
+      seen.add(key);
+      atoms.push({el:s.el,x,y,z,occ:s.occ,B:s.B});
+    }
+  }
+
+  const name = block.items["_chemical_name_systematic"] || block.items["_chemical_name_common"] || block.name || "";
+  return {
+    cell, atoms, nOps:ops.length, nSites:sites.length, symWarn,
+    unknown:[...unknown],
+    hm: block.items["_symmetry_space_group_name_h-m"] || block.items["_space_group_name_h-m_alt"] || "",
+    formula: block.items["_chemical_formula_sum"] || block.items["_chemical_formula_moiety"] || "",
+    ccdc: block.items["_database_code_ccdc"] || block.items["_database_code_depnum_ccdc_archive"] || "",
+    blockName: block.name, chemName: name
+  };
+}
+
+/* ---------------- reciprocal metric ---------------- */
+function recipMetric(cell){
+  const d2r=Math.PI/180;
+  const {a,b,c}=cell, al=cell.al*d2r, be=cell.be*d2r, ga=cell.ga*d2r;
+  const ca=Math.cos(al), cb=Math.cos(be), cg=Math.cos(ga);
+  const G=[[a*a, a*b*cg, a*c*cb],[a*b*cg, b*b, b*c*ca],[a*c*cb, b*c*ca, c*c]];
+  const det = G[0][0]*(G[1][1]*G[2][2]-G[1][2]*G[2][1])
+            - G[0][1]*(G[1][0]*G[2][2]-G[1][2]*G[2][0])
+            + G[0][2]*(G[1][0]*G[2][1]-G[1][1]*G[2][0]);
+  if(Math.abs(det)<1e-12) throw new Error("격자 상수가 올바르지 않습니다.");
+  const inv=(i,j)=>{
+    const m=[[0,1],[0,2],[1,2]];
+    const r=[0,1,2].filter(k=>k!==j), s=[0,1,2].filter(k=>k!==i);
+    const cof = G[r[0]][s[0]]*G[r[1]][s[1]] - G[r[0]][s[1]]*G[r[1]][s[0]];
+    return ((i+j)%2?-1:1)*cof/det;
+  };
+  const Gs=[[inv(0,0),inv(0,1),inv(0,2)],[inv(1,0),inv(1,1),inv(1,2)],[inv(2,0),inv(2,1),inv(2,2)]];
+  return {Gs, vol: Math.sqrt(det)};
+}
+
+/* ---------------- powder pattern ---------------- */
+function simulatePattern(st, opt){
+  const {lambda, tthMin, tthMax, applyLP, bDefault} = opt;
+  const {Gs} = recipMetric(st.cell);
+  const gmax = 2*Math.sin(Math.min(tthMax,179.9)/2*Math.PI/180)/lambda;
+  const gmin = 2*Math.sin(Math.max(tthMin,0.01)/2*Math.PI/180)/lambda;
+  const hmax=Math.max(1,Math.floor(st.cell.a*gmax));
+  const kmax=Math.max(1,Math.floor(st.cell.b*gmax));
+  const lmax=Math.max(1,Math.floor(st.cell.c*gmax));
+
+  /* group atoms by element */
+  const groups={};
+  for(const at of st.atoms){
+    (groups[at.el] = groups[at.el] || []).push(at);
+  }
+  const gk=Object.keys(groups);
+  const gx={}, gy={}, gz={}, go={}, gb={};
+  for(const el of gk){
+    const arr=groups[el], n=arr.length;
+    const X=new Float64Array(n),Y=new Float64Array(n),Z=new Float64Array(n),O=new Float64Array(n),B=new Float64Array(n);
+    for(let i=0;i<n;i++){ X[i]=arr[i].x; Y[i]=arr[i].y; Z[i]=arr[i].z; O[i]=arr[i].occ; B[i]=isFinite(arr[i].B)? arr[i].B : bDefault; }
+    gx[el]=X; gy[el]=Y; gz[el]=Z; go[el]=O; gb[el]=B;
+  }
+  /* per element unique B values */
+  const gbu={};
+  for(const el of gk){ gbu[el]=[...new Set(Array.from(gb[el]))]; }
+
+  const TAU=2*Math.PI;
+  const peaks=[];
+  for(let h=-hmax;h<=hmax;h++){
+    for(let k=-kmax;k<=kmax;k++){
+      for(let l=0;l<=lmax;l++){
+        if(l===0){ if(k<0) continue; if(k===0 && h<=0) continue; }
+        const g2 = Gs[0][0]*h*h + Gs[1][1]*k*k + Gs[2][2]*l*l
+                 + 2*(Gs[0][1]*h*k + Gs[0][2]*h*l + Gs[1][2]*k*l);
+        if(g2<=0) continue;
+        const g=Math.sqrt(g2);
+        if(g<gmin || g>gmax) continue;
+        const s2=(g/2)*(g/2);
+        let reC=0, imC=0;
+        for(const el of gk){
+          const p=SCAT[el];
+          const f0 = p[0] - 41.78214*s2*( p[1]*Math.exp(-p[2]*s2) + p[3]*Math.exp(-p[4]*s2)
+                                        + p[5]*Math.exp(-p[6]*s2) + p[7]*Math.exp(-p[8]*s2) );
+          const X=gx[el],Y=gy[el],Z=gz[el],O=go[el],B=gb[el];
+          let re=0, im=0;
+          for(let i=0;i<X.length;i++){
+            const ph=TAU*(h*X[i]+k*Y[i]+l*Z[i]);
+            const w=O[i]*Math.exp(-B[i]*s2);
+            re += w*Math.cos(ph); im += w*Math.sin(ph);
+          }
+          reC += f0*re; imC += f0*im;
+        }
+        let I = reC*reC + imC*imC;
+        if(I<1e-8) continue;
+        const sth = lambda*g/2;
+        if(sth>=1) continue;
+        const th=Math.asin(sth);
+        if(applyLP){
+          const c2t=Math.cos(2*th), st_=Math.sin(th), ct=Math.cos(th);
+          I *= (1+c2t*c2t)/(st_*st_*ct);
+        }
+        peaks.push({tth: 2*th*180/Math.PI, I: 2*I, h,k,l});
+      }
+    }
+  }
+  /* merge */
+  peaks.sort((p,q)=>p.tth-q.tth);
+  const merged=[];
+  for(const p of peaks){
+    const last=merged[merged.length-1];
+    if(last && Math.abs(last.tth-p.tth)<1e-3){
+      if(p.I>last.Imax){ last.h=p.h; last.k=p.k; last.l=p.l; last.Imax=p.I; }
+      last.I+=p.I;
+    }else{
+      merged.push({tth:p.tth,I:p.I,Imax:p.I,h:p.h,k:p.k,l:p.l});
+    }
+  }
+  let mx=0; for(const p of merged) if(p.I>mx) mx=p.I;
+  if(mx>0) for(const p of merged) p.rel = 100*p.I/mx;
+  return merged;
+}
+
+/* profile convolution onto a grid */
+function convolve(peaks, tthMin, tthMax, fwhm, eta, step){
+  const n = Math.max(2, Math.round((tthMax-tthMin)/step)+1);
+  const x=new Float64Array(n), y=new Float64Array(n);
+  for(let i=0;i<n;i++) x[i]=tthMin+i*step;
+  const w=fwhm, hw=w/2;
+  const gN=(2/w)*Math.sqrt(Math.LN2/Math.PI), gK=4*Math.LN2/(w*w);
+  const lN=2/(Math.PI*w), lK=4/(w*w);
+  const span=Math.max(5*w, 0.5);
+  for(const p of peaks){
+    if(p.tth < tthMin-span || p.tth > tthMax+span) continue;
+    const i0=Math.max(0, Math.floor((p.tth-span-tthMin)/step));
+    const i1=Math.min(n-1, Math.ceil((p.tth+span-tthMin)/step));
+    for(let i=i0;i<=i1;i++){
+      const d=x[i]-p.tth, d2=d*d;
+      const G=gN*Math.exp(-gK*d2), L=lN/(1+lK*d2);
+      y[i]+= p.I*(eta*L+(1-eta)*G);
+    }
+  }
+  return {x,y};
+}
+
+/* =====================================================================
+   state  (메모리에만 존재, localStorage / sessionStorage / cookie 미사용)
+   ===================================================================== */
+const state = { traces:[], seq:0, payload:null };
+const MATCH_COLOR = "#C51D9B";   /* 오차 범위 안에서 일치한 reflection 표시색 */
+state.picks = [];                /* 커서로 선택한 실험 peak, {traceId, tth} */
+const $ = (id)=>document.getElementById(id);
+const esc = (v)=>String(v==null?"":v).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------------- experimental data parsing ---------------- */
+function parseTwoColumn(text){
+  const x=[],y=[];
+  const re=/^[\s,;]*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)[\s,;\t]+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)/;
+  for(const line of text.split(/\r\n|\r|\n/)){
+    const t=line.trim();
+    if(!t) continue;
+    if(/^[#*!;']/.test(t)) continue;
+    const m=re.exec(t);
+    if(!m) continue;
+    const a=parseFloat(m[1]), b=parseFloat(m[2]);
+    if(!isFinite(a)||!isFinite(b)) continue;
+    x.push(a); y.push(b);
+  }
+  return {x,y};
+}
+function parseXRDML(text){
+  const doc=new DOMParser().parseFromString(text,"application/xml");
+  if(doc.querySelector("parsererror")) throw new Error("XRDML 구문을 읽지 못했습니다.");
+  const inten = doc.getElementsByTagName("intensities")[0] || doc.getElementsByTagName("counts")[0];
+  if(!inten) throw new Error("XRDML 안에서 intensities를 찾지 못했습니다.");
+  const y = inten.textContent.trim().split(/\s+/).map(Number).filter(v=>isFinite(v));
+  let start=NaN,end=NaN;
+  for(const p of doc.getElementsByTagName("positions")){
+    if((p.getAttribute("axis")||"").replace(/\s/g,"")==="2Theta"){
+      const s=p.getElementsByTagName("startPosition")[0], e=p.getElementsByTagName("endPosition")[0];
+      const lst=p.getElementsByTagName("listPositions")[0];
+      if(lst){
+        const xs=lst.textContent.trim().split(/\s+/).map(Number);
+        if(xs.length===y.length) return {x:xs,y};
+      }
+      if(s&&e){ start=parseFloat(s.textContent); end=parseFloat(e.textContent); }
+    }
+  }
+  if(!isFinite(start)||!isFinite(end)) throw new Error("XRDML 안에서 2Theta 축 정보를 찾지 못했습니다.");
+  const n=y.length, step=(end-start)/(n-1), x=new Array(n);
+  for(let i=0;i<n;i++) x[i]=start+i*step;
+  return {x,y};
+}
+function parseExpFile(name, text){
+  let d;
+  if(/\.(xrdml|xml)$/i.test(name)) d=parseXRDML(text);
+  else d=parseTwoColumn(text);
+  if(d.x.length<10) throw new Error("2열 수치 데이터를 10점 이상 찾지 못했습니다.");
+  const idx=d.x.map((v,i)=>i).sort((p,q)=>d.x[p]-d.x[q]);
+  return { x:Float64Array.from(idx.map(i=>d.x[i])), y:Float64Array.from(idx.map(i=>d.y[i])) };
+}
+
+/* ---------------- trace helpers ---------------- */
+function addTrace(t){
+  t.id = ++state.seq;
+  if(!t.color) t.color = t.kind==="exp" ? PALETTE[0] : PALETTE[1];
+  t.visible = true;
+  state.traces.push(t);
+  state.traces.sort((a,b)=> (a.kind===b.kind)? a.id-b.id : (a.kind==="exp"? -1: 1));
+}
+function sliceWindow(x,y,lo,hi){
+  const xs=[],ys=[];
+  for(let i=0;i<x.length;i++){ if(x[i]>=lo && x[i]<=hi){ xs.push(x[i]); ys.push(y[i]); } }
+  return {x:xs,y:ys};
+}
+function maxOf(a){ let m=-Infinity; for(const v of a) if(v>m) m=v; return m; }
+function minOf(a){ let m=Infinity; for(const v of a) if(v<m) m=v; return m; }
+
+/* ---------------- prepared drawing data ---------------- */
+function prepare(){
+  const lo=parseFloat($("tthMin").value), hi=parseFloat($("tthMax").value);
+  const norm=$("cbNorm").checked;
+  const vis=state.traces.filter(t=>t.visible);
+  const prep=[];
+  let expMax=0;
+  for(const t of vis){
+    if(t.kind!=="exp") continue;
+    const w=sliceWindow(t.x,t.y,lo,hi);
+    if(w.y.length){ const m=maxOf(w.y); if(m>expMax) expMax=m; }
+  }
+  for(const t of vis){
+    const w=sliceWindow(t.x,t.y,lo,hi);
+    if(!w.y.length){ prep.push({t,x:[],y:[],unit:1}); continue; }
+    let ys;
+    if(norm){
+      const m=maxOf(w.y), mn=Math.min(0,minOf(w.y));
+      const den=(m-mn)||1;
+      ys=w.y.map(v=>(v-mn)/den);
+    }else if(t.kind==="exp"){
+      ys=w.y.slice();
+    }else{
+      const m=maxOf(w.y)||1;
+      const target=expMax>0? expMax : 1;
+      ys=w.y.map(v=>v/m*target);
+    }
+    prep.push({t,x:w.x,y:ys});
+  }
+  return {prep, lo, hi, norm};
+}
+
+/* ---------------- plot ---------------- */
+const cv=$("plot"), ctx=cv.getContext("2d");
+let plotGeom=null, pickTargets=[];
+
+function resizeCanvas(){
+  const dpr=window.devicePixelRatio||1;
+  const r=cv.getBoundingClientRect();
+  cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {w:r.width,h:r.height};
+}
+function niceStep(span, target){
+  const raw=span/target, p=Math.pow(10,Math.floor(Math.log10(raw))), n=raw/p;
+  const m = n<1.5?1 : n<3?2 : n<7?5 : 10;
+  return m*p;
+}
+function draw(){
+  const {w,h}=resizeCanvas();
+  ctx.clearRect(0,0,w,h);
+  const {prep,lo,hi,norm}=prepare();
+  if(!(isFinite(lo)&&isFinite(hi)&&hi>lo)){
+    ctx.fillStyle="#A32219"; ctx.font='13px "IBM Plex Sans", sans-serif'; ctx.textAlign="center";
+    ctx.fillText("2 theta 범위를 확인하십시오. 최소값보다 최대값이 커야 합니다.", w/2, h/2);
+    return;
+  }
+  const off=parseFloat($("rOff").value)/100;
+  const showTicks=$("cbTicks").checked;
+
+  const M={l:62,r:16,t:14,b:40};
+  const pw=w-M.l-M.r, ph=h-M.t-M.b;
+  ctx.font='11px "IBM Plex Mono", monospace';
+
+  /* y scale */
+  let unit=1;
+  for(const p of prep){ if(p.y.length){ const m=maxOf(p.y); if(m>unit) unit=m; } }
+  if(!norm){ /* unit is raw counts scale */ } else { unit=1; }
+  const n=prep.length;
+  const baseStep=unit*off;
+  let yTop=unit*1.06 + baseStep*Math.max(0,n-1);
+  let yBot=0;
+  if(!$("cbYAuto").checked){
+    const a=parseFloat($("yMin").value), b=parseFloat($("yMax").value);
+    if(isFinite(a)&&isFinite(b)&&b>a){ yBot=a; yTop=b; }
+  }
+  const X=(v)=>M.l+(v-lo)/((hi-lo)||1)*pw;
+  const Y=(v)=>M.t+ph-(v-yBot)/((yTop-yBot)||1)*ph;
+  plotGeom={M,pw,ph,lo,hi,yBot,yTop,X,Y};
+
+  /* frame + grid */
+  ctx.save();
+  ctx.strokeStyle="#CFCBC0"; ctx.lineWidth=1;
+  let xs=niceStep(hi-lo,9); if(!isFinite(xs)||xs<=0) xs=1;
+  ctx.fillStyle="#5C6169";
+  for(let v=Math.ceil(lo/xs)*xs; v<=hi+1e-9; v+=xs){
+    const px=Math.round(X(v))+0.5;
+    ctx.globalAlpha=.35; ctx.beginPath(); ctx.moveTo(px,M.t); ctx.lineTo(px,M.t+ph); ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.beginPath(); ctx.moveTo(px,M.t+ph); ctx.lineTo(px,M.t+ph+4); ctx.stroke();
+    ctx.textAlign="center"; ctx.fillText(Number(v.toFixed(6)).toString(), px, M.t+ph+17);
+  }
+  ctx.strokeStyle="#2B2E33"; ctx.globalAlpha=1;
+  ctx.strokeRect(M.l+0.5,M.t+0.5,pw,ph);
+
+  /* y ticks only when unstacked */
+  ctx.textAlign="right";
+  if(off===0){
+    let ys=niceStep(yTop-yBot,6); if(!isFinite(ys)||ys<=0) ys=1;
+    for(let v=Math.ceil(yBot/ys)*ys; v<=yTop+1e-9; v+=ys){
+      const py=Math.round(Y(v))+0.5;
+      ctx.strokeStyle="#CFCBC0"; ctx.globalAlpha=.35;
+      ctx.beginPath(); ctx.moveTo(M.l,py); ctx.lineTo(M.l+pw,py); ctx.stroke(); ctx.globalAlpha=1;
+      ctx.fillStyle="#5C6169";
+      const lbl = Math.abs(v)>=10000? v.toExponential(1) : Number(v.toFixed(4)).toString();
+      ctx.fillText(lbl, M.l-7, py+4);
+    }
+  }
+  /* axis labels */
+  ctx.fillStyle="#2B2E33";
+  ctx.font='600 12px "IBM Plex Sans", sans-serif';
+  ctx.textAlign="center";
+  ctx.fillText("2 theta (degree)", M.l+pw/2, h-8);
+  ctx.save();
+  ctx.translate(14,M.t+ph/2); ctx.rotate(-Math.PI/2);
+  const ylab = norm ? (off>0? "Normalized intensity, offset stacked" : "Normalized intensity (a.u.)")
+                    : (off>0? "Intensity, offset stacked" : "Intensity (counts)");
+  ctx.fillText(ylab,0,0);
+  ctx.restore();
+  ctx.restore();
+
+  /* traces, index 0 on top */
+  ctx.save();
+  ctx.beginPath(); ctx.rect(M.l,M.t,pw,ph); ctx.clip();
+  ctx.lineJoin="round"; ctx.lineCap="round";
+  const hits=[];
+  prep.forEach((p,i)=>{
+    const base=(n-1-i)*baseStep;
+    if(showTicks && p.t.kind==="sim" && p.t.peaks){
+      const y0=Y(base), y1=Y(base+unit*0.045), y1m=Y(base+unit*0.062);
+      const set=(list,color,alpha,lw,ytop)=>{
+        if(!list.length) return;
+        ctx.strokeStyle=color; ctx.globalAlpha=alpha; ctx.lineWidth=lw;
+        ctx.beginPath();
+        for(const pk of list){ const px=Math.round(X(pk.tth))+0.5; ctx.moveTo(px,y0); ctx.lineTo(px,ytop); }
+        ctx.stroke(); ctx.globalAlpha=1;
+      };
+      const arr=p.t.peaks.filter(pk=>pk.tth>=lo&&pk.tth<=hi&&pk.rel>=0.15);
+      set(arr.filter(pk=>!pk.matched), p.t.color, .55, 1, y1);
+      set(arr.filter(pk=>pk.matched), MATCH_COLOR, .95, 1.8, y1m);
+    }
+    if(!p.x.length) return;
+    ctx.strokeStyle=p.t.color; ctx.lineWidth=p.t.kind==="exp"?1.3:1.1; ctx.globalAlpha=1;
+    ctx.beginPath();
+    for(let j=0;j<p.x.length;j++){
+      const px=X(p.x[j]), py=Y(p.y[j]+base);
+      if(j===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    /* 실험 peak 인식 막대, 클릭으로 선택 */
+    if(p.t.kind==="exp" && p.t.expPeaks){
+      ctx.font='10px "IBM Plex Mono", monospace';
+      for(const pk of p.t.expPeaks){
+        if(pk.tth<lo||pk.tth>hi) continue;
+        let j=0, bd=Infinity;
+        for(let m=0;m<p.x.length;m++){ const dd=Math.abs(p.x[m]-pk.tth); if(dd<bd){ bd=dd; j=m; } }
+        const apex=p.y[j]+base;
+        const px=Math.round(X(pk.tth))+0.5;
+        const yA=Y(apex)-4, sel=isPicked(p.t.id,pk.tth);
+        const len=sel? unit*0.075 : unit*0.035;
+        const yB=Y(apex+len)-4;
+        ctx.strokeStyle=sel? MATCH_COLOR : p.t.color;
+        ctx.globalAlpha=sel?1:.5; ctx.lineWidth=sel?1.8:1;
+        ctx.beginPath(); ctx.moveTo(px,yA); ctx.lineTo(px,yB); ctx.stroke();
+        if(sel){
+          ctx.fillStyle=MATCH_COLOR; ctx.textAlign="center";
+          ctx.fillText(pk.tth.toFixed(2), px, yB-3);
+        }
+        ctx.globalAlpha=1;
+        hits.push({traceId:p.t.id, tth:pk.tth, px, py:(yA+yB)/2});
+      }
+    }
+  });
+  ctx.restore();
+  pickTargets=hits;
+
+  /* legend (목차) */
+  const items=prep.map(p=>p.t);
+  if(items.length){
+    ctx.font='11.5px "IBM Plex Sans", sans-serif';
+    let bw=0; for(const t of items) bw=Math.max(bw, ctx.measureText(t.name).width);
+    bw+=34;
+    const bh=items.length*17+12;
+    const bx=M.l+pw-bw-10, by=M.t+10;
+    ctx.fillStyle="rgba(255,255,255,.92)"; ctx.strokeStyle="#CFCBC0"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.rect(bx+0.5,by+0.5,bw,bh); ctx.fill(); ctx.stroke();
+    items.forEach((t,i)=>{
+      const yy=by+18+i*17;
+      ctx.strokeStyle=t.color; ctx.lineWidth=2.2;
+      ctx.beginPath(); ctx.moveTo(bx+9,yy-4); ctx.lineTo(bx+25,yy-4); ctx.stroke();
+      ctx.fillStyle="#22262B"; ctx.textAlign="left";
+      ctx.fillText(t.name, bx+30, yy);
+    });
+  }
+  $("plotLampTxt").textContent = state.traces.length? state.traces.length+" traces 표시 중" : "데이터 없음";
+  $("plotLamp").className = state.traces.length? "lamp on" : "lamp";
+}
+
+/* readout */
+cv.addEventListener("mousemove",(e)=>{
+  if(!plotGeom) return;
+  const r=cv.getBoundingClientRect();
+  const px=e.clientX-r.left, py=e.clientY-r.top;
+  const {M,pw,ph,lo,hi}=plotGeom;
+  if(px<M.l||px>M.l+pw||py<M.t||py>M.t+ph){ $("readout").textContent=""; return; }
+  const tth=lo+(px-M.l)/pw*(hi-lo);
+  const lam=currentLambda();
+  const d=lam/(2*Math.sin(tth/2*Math.PI/180));
+  $("readout").textContent=`2θ ${tth.toFixed(2)}°   d ${d.toFixed(3)} Å`;
+});
+cv.addEventListener("mouseleave",()=>{ $("readout").textContent=""; });
+
+function nearestTarget(px,py){
+  let best=null;
+  for(const t of pickTargets){
+    const dx=Math.abs(t.px-px), dy=Math.abs(t.py-py);
+    if(dx<=6 && dy<=26 && (!best || dx<best.dx)) best={dx,t};
+  }
+  return best? best.t : null;
+}
+cv.addEventListener("mousemove",(e)=>{
+  const r=cv.getBoundingClientRect();
+  cv.style.cursor = nearestTarget(e.clientX-r.left, e.clientY-r.top)? "pointer" : "default";
+});
+cv.addEventListener("click",(e)=>{
+  const r=cv.getBoundingClientRect();
+  const t=nearestTarget(e.clientX-r.left, e.clientY-r.top);
+  if(t) togglePick(t.traceId,t.tth);
+});
+
+/* ---------------- trace list UI ---------------- */
+function renderTraceList(){
+  const box=$("traceList"); box.innerHTML="";
+  $("emptyHint").style.display = state.traces.length? "none":"block";
+  for(const t of state.traces){
+    const el=document.createElement("div");
+    el.className="trace";
+    el.innerHTML=`
+      <div class="head">
+        <input type="checkbox" ${t.visible?"checked":""} aria-label="표시" style="accent-color:${t.color}">
+        <span class="dot" style="background:${t.color}"></span>
+        <span class="nm" title="${esc(t.name)}">${esc(t.name)}</span>
+        <span class="kind">${t.kind==="exp"?"EXP":"SIM"}</span>
+        <button class="tiny" type="button" data-act="toggle">설정</button>
+        <button class="tiny" type="button" data-act="del">×</button>
+      </div>
+      <div class="ctl">
+        <div class="swatches">${PALETTE.map(c=>`<button class="sw" type="button" style="background:${c}" data-col="${c}" title="${c}"></button>`).join("")}</div>
+        <input type="color" value="${t.color}">
+        <input type="text" value="${t.color}" style="width:88px" spellcheck="false">
+        <input type="text" value="${esc(t.name)}" data-role="name" placeholder="표시 이름">
+      </div>`;
+    const cb=el.querySelector('input[type=checkbox]');
+    cb.addEventListener("change",()=>{ t.visible=cb.checked; draw(); });
+    el.querySelector('[data-act=toggle]').addEventListener("click",()=>el.classList.toggle("open"));
+    el.querySelector('[data-act=del]').addEventListener("click",()=>{
+      state.traces=state.traces.filter(x=>x.id!==t.id);
+      renderTraceList(); updateMatch(); draw();
+    });
+    const colorInput=el.querySelector('input[type=color]');
+    const hexInput=el.querySelectorAll('.ctl input[type=text]')[0];
+    const setColor=(c)=>{
+      if(!/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(c)) return false;
+      t.color=c; colorInput.value=c; hexInput.value=c;
+      el.querySelector(".dot").style.background=c; cb.style.accentColor=c; draw(); return true;
+    };
+    colorInput.addEventListener("input",()=>setColor(colorInput.value));
+    hexInput.addEventListener("change",()=>{ if(!setColor(hexInput.value.trim())) hexInput.value=t.color; });
+    el.querySelectorAll(".sw").forEach(b=>b.addEventListener("click",()=>setColor(b.dataset.col)));
+    const nameInput=el.querySelector('[data-role=name]');
+    nameInput.addEventListener("change",()=>{ t.name=nameInput.value.trim()||t.name; renderTraceList(); draw(); });
+    box.appendChild(el);
+  }
+}
+
+/* ---------------- peak picking + match ---------------- */
+function pickExpPeaks(x,y,lo,hi,halfW){
+  const w=sliceWindow(x,y,lo,hi);
+  const n=w.y.length; if(n<9) return [];
+  const sm=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    let s=0,c=0;
+    for(let j=Math.max(0,i-2);j<=Math.min(n-1,i+2);j++){ s+=w.y[j]; c++; }
+    sm[i]=s/c;
+  }
+  const mx=maxOf(sm), mn=minOf(sm), thr=mn+0.03*(mx-mn);
+  const step=(w.x[n-1]-w.x[0])/(n-1) || 0.02;
+  const k=Math.max(2, Math.round(0.12/step));
+  const out=[];
+  for(let i=k;i<n-k;i++){
+    if(sm[i]<thr) continue;
+    let top=true;
+    for(let j=i-k;j<=i+k;j++){ if(sm[j]>sm[i]){ top=false; break; } }
+    if(!top) continue;
+    if(out.length && i-out[out.length-1].i<=k){ if(sm[i]>out[out.length-1].I) out[out.length-1]={i,tth:w.x[i],I:sm[i]}; continue; }
+    out.push({i,tth:w.x[i],I:sm[i]});
+  }
+  if(!out.length) return [];
+  for(const p of out){
+    /* 창 양 끝을 잇는 직선을 배경으로 삼아 면적과 높이를 구한다 */
+    let i0=p.i, i1=p.i;
+    while(i0>0 && w.x[p.i]-w.x[i0]<halfW) i0--;
+    while(i1<n-1 && w.x[i1]-w.x[p.i]<halfW) i1++;
+    const x0=w.x[i0], x1=w.x[i1], y0=sm[i0], y1=sm[i1];
+    const slope=(x1-x0)? (y1-y0)/(x1-x0) : 0;
+    const base=(xx)=> y0+slope*(xx-x0);
+    let a=0;
+    for(let j=i0;j<i1;j++){
+      const v0=Math.max(0,w.y[j]-base(w.x[j])), v1=Math.max(0,w.y[j+1]-base(w.x[j+1]));
+      a+=0.5*(v0+v1)*(w.x[j+1]-w.x[j]);
+    }
+    p.area=a;
+    const h=sm[p.i]-base(w.x[p.i]);
+    p.height=Math.max(0,h);
+    p.raw=w.y[p.i];
+    /* FWHM, 좌우 4*halfW 안의 극소점을 배경으로 잡아 반높이 교차점을 선형 보간 */
+    p.fwhm=null;
+    const fr=Math.max(2, Math.round(4*halfW/step));
+    let jl=p.i, jr=p.i;
+    for(let j=Math.max(0,p.i-fr); j<=p.i; j++) if(sm[j]<sm[jl]) jl=j;
+    for(let j=p.i; j<=Math.min(n-1,p.i+fr); j++) if(sm[j]<sm[jr]) jr=j;
+    const fx0=w.x[jl], fx1=w.x[jr], fy0=sm[jl], fy1=sm[jr];
+    const fslope=(fx1-fx0)? (fy1-fy0)/(fx1-fx0) : 0;
+    const fbase=(xx)=> fy0+fslope*(xx-fx0);
+    const hF=sm[p.i]-fbase(w.x[p.i]);
+    if(hF>0){
+      const half=hF/2;
+      const lim=Math.max(1, Math.round(3*halfW/step));
+      const cross=(dir)=>{
+        let prev=p.i;
+        for(let m=1;m<=lim;m++){
+          const j=p.i+dir*m;
+          if(j<0||j>n-1) return null;
+          /* 평활 곡선은 폭을 넓히므로 교차점은 원자료에서 찾고, 잡음 오검출을 막기 위해 다음 점도 확인 */
+          const vj=w.y[j]-fbase(w.x[j]);
+          const jn=j+dir;
+          const vn=(jn<0||jn>n-1)? vj : w.y[jn]-fbase(w.x[jn]);
+          if(vj<=half && vn<=half){
+            const vp=w.y[prev]-fbase(w.x[prev]);
+            const f=(vp-half)/((vp-vj)||1);
+            return w.x[prev]+f*(w.x[j]-w.x[prev]);
+          }
+          prev=j;
+        }
+        return null;
+      };
+      const xl=cross(-1), xr=cross(1);
+      if(xl!==null && xr!==null) p.fwhm=xr-xl;
+    }
+  }
+  const topH=maxOf(out.map(p=>p.height))||1;
+  const topA=maxOf(out.map(p=>p.area))||1;
+  return out.map(p=>({tth:p.tth, rel:100*p.height/(topH||1), relArea:100*p.area/(topA||1),
+                      height:p.height, area:p.area, fwhm:p.fwhm}));
+}
+
+function clearTickFlags(){
+  for(const t of state.traces) if(t.kind==="sim"&&t.peaks) for(const p of t.peaks) p.matched=false;
+}
+
+function refreshExpPeaks(){
+  const lo=parseFloat($("tthMin").value), hi=parseFloat($("tthMax").value);
+  const fw=Math.max(0.005,parseFloat($("fwhm").value)||0.12);
+  const halfW=Math.max(0.20, 2*fw);
+  for(const t of state.traces){
+    if(t.kind!=="exp") continue;
+    t.expPeaks = (isFinite(lo)&&isFinite(hi)&&hi>lo)? pickExpPeaks(t.x,t.y,lo,hi,halfW) : [];
+  }
+  /* 사라진 peak에 걸린 선택은 버린다 */
+  state.picks = state.picks.filter(sel=>{
+    const t=state.traces.find(x=>x.id===sel.traceId);
+    return t && t.expPeaks && t.expPeaks.some(p=>Math.abs(p.tth-sel.tth)<0.05);
+  });
+}
+function isPicked(traceId,tth){
+  return state.picks.some(s=>s.traceId===traceId && Math.abs(s.tth-tth)<0.05);
+}
+function togglePick(traceId,tth){
+  const i=state.picks.findIndex(s=>s.traceId===traceId && Math.abs(s.tth-tth)<0.05);
+  if(i>=0) state.picks.splice(i,1); else state.picks.push({traceId,tth});
+  renderPicks(); draw();
+}
+function renderPicks(){
+  const box=$("pickBox");
+  if(!state.picks.length){
+    box.innerHTML='<span class="hint">선택된 peak이 없습니다.</span>'; return;
+  }
+  const lam=currentLambda();
+  const rows=[];
+  for(const sel of state.picks){
+    const t=state.traces.find(x=>x.id===sel.traceId); if(!t||!t.expPeaks) continue;
+    const p=t.expPeaks.find(q=>Math.abs(q.tth-sel.tth)<0.05); if(!p) continue;
+    rows.push({name:t.name, color:t.color, p});
+  }
+  rows.sort((a,b)=>a.p.tth-b.p.tth);
+  box.innerHTML=`<table class="picks"><thead><tr>
+      <th>data</th><th>2θ</th><th>d (Å)</th><th>FWHM</th><th>높이</th><th>면적</th><th>상대 면적</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td class="sel">${esc(r.name)}</td>
+      <td>${r.p.tth.toFixed(3)}</td>
+      <td>${(lam/(2*Math.sin(r.p.tth/2*Math.PI/180))).toFixed(4)}</td>
+      <td>${r.p.fwhm===null?"-":r.p.fwhm.toFixed(3)}</td>
+      <td>${r.p.height.toExponential(2)}</td>
+      <td>${r.p.area.toExponential(2)}</td>
+      <td>${r.p.relArea.toFixed(1)}</td></tr>`).join("")}
+    </tbody></table>`;
+}
+
+function updateMatch(){
+  const lo=parseFloat($("tthMin").value), hi=parseFloat($("tthMax").value);
+  const tol=parseFloat($("tolMatch").value)||0.3;
+  const N=Math.max(3,Math.min(25,parseInt($("nMatch").value)||10));
+  refreshExpPeaks(); renderPicks();
+  const exp=state.traces.find(t=>t.kind==="exp"&&t.visible);
+  const sim=state.traces.find(t=>t.kind==="sim"&&t.visible&&t.peaks);
+  const box=$("matchBox");
+  clearTickFlags();
+  if(!exp||!sim){
+    box.innerHTML='<span class="hint">실험 데이터와 CIF 시뮬레이션이 모두 있어야 비교가 표시됩니다.</span>';
+    state.payload=null; updatePayloadPreview(); return;
+  }
+  const ep=exp.expPeaks||[];
+  const inRange=sim.peaks.filter(p=>p.tth>=lo&&p.tth<=hi);
+  const shown=inRange.filter(p=>p.rel>=0.15);
+  const nearest=(p)=>{
+    let best=null;
+    for(const q of ep){ const d=q.tth-p.tth; if(Math.abs(d)<=tol && (!best||Math.abs(d)<Math.abs(best.d))) best={d,q}; }
+    return best;
+  };
+  for(const p of inRange) p.matched = !!nearest(p);
+
+  const sp=[...inRange].sort((a,b)=>b.rel-a.rel).slice(0,N).sort((a,b)=>a.tth-b.tth);
+  const rows=[]; let hits=0, sumAbs=0;
+  for(const p of sp){
+    const b=nearest(p);
+    if(b){ hits++; sumAbs+=Math.abs(b.d); }
+    rows.push({tth:p.tth, rel:p.rel, hkl:`${p.h} ${p.k} ${p.l}`,
+               d:b? b.d : null, ieRaw:b? b.q.relArea : null});
+  }
+  const rate=sp.length? 100*hits/sp.length : 0;
+
+  /* 강도 비교, 일치한 peak 중 계산 강도가 가장 큰 것을 100으로 두고 양쪽을 같은 기준으로 환산 */
+  const pairs=rows.filter(r=>r.ieRaw!==null);
+  let refRow=null, RI=null, pear=null;
+  if(pairs.length){
+    refRow=pairs.reduce((a,b)=> b.rel>a.rel? b:a);
+    for(const r of rows){
+      r.is100 = refRow.rel>0? 100*r.rel/refRow.rel : null;
+      r.ie100 = (r.ieRaw!==null && refRow.ieRaw>0)? 100*r.ieRaw/refRow.ieRaw : null;
+      r.ratio = (r.is100 && r.ie100!==null)? r.ie100/r.is100 : null;
+    }
+    if(pairs.length>=2){
+      let num=0,den=0;
+      for(const r of pairs){ num+=Math.abs(r.ie100-r.is100); den+=r.ie100; }
+      RI = den>0? 100*num/den : null;
+      const n=pairs.length;
+      const mx=pairs.reduce((a,r)=>a+r.is100,0)/n, my=pairs.reduce((a,r)=>a+r.ie100,0)/n;
+      let sxy=0,sx2=0,sy2=0;
+      for(const r of pairs){ sxy+=(r.is100-mx)*(r.ie100-my); sx2+=(r.is100-mx)**2; sy2+=(r.ie100-my)**2; }
+      pear=(sx2>0&&sy2>0)? sxy/Math.sqrt(sx2*sy2) : null;
+    }
+  }else{
+    for(const r of rows){ r.is100=r.rel; r.ie100=null; r.ratio=null; }
+  }
+  const off=rows.filter(r=>r.ratio!==null && (r.ratio>1.5||r.ratio<0.667)).length;
+
+  box.innerHTML=`
+    <div class="kv">
+      <span>추출 reflection</span><b>${inRange.length}개 (표시 ${shown.length}개)</b>
+      <span>비교 피크</span><b>${sp.length}개, 일치 피크 ${hits}개 (${rate.toFixed(0)}%${hits? `, 평균 |Δ2θ| ${(sumAbs/hits).toFixed(3)}°`:""})</b>
+      <span>강도 비교</span><b>${pairs.length}쌍${refRow? `, 기준 ${refRow.hkl}`:""}${RI!==null? `, R<sub>I</sub> ${RI.toFixed(1)}%`:""}${pear!==null? `, r ${pear.toFixed(3)}`:""}</b>
+      <span>강도 이탈</span><b>${off}개 (실측 나누기 계산이 0.67 에서 1.5 밖)</b>
+    </div>
+    <table class="match"><thead><tr><th>hkl</th><th>2θ</th><th>계산</th><th>Δ2θ</th><th>실측</th><th>비</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${r.hkl}</td><td>${r.tth.toFixed(2)}</td><td>${r.is100===null?"-":r.is100.toFixed(0)}</td>
+      <td class="${r.d===null?"miss":"hit"}">${r.d===null?"없음":(r.d>=0?"+":"")+r.d.toFixed(3)}</td>
+      <td>${r.ie100===null?"-":r.ie100.toFixed(0)}</td>
+      <td class="${r.ratio===null?"":(r.ratio>1.5||r.ratio<0.667)?"miss":"hit"}">${r.ratio===null?"-":r.ratio.toFixed(2)}</td></tr>`).join("")}
+    </tbody></table>`;
+
+  state.payload={
+    wavelength_A: currentLambda(),
+    two_theta_range_deg:[lo,hi],
+    cif:{
+      file: sim.name, formula: sim.meta.formula||null, space_group: sim.meta.hm||null,
+      cell: sim.meta.cell, ccdc: sim.meta.ccdc||null,
+      reflections_in_range: inRange.length, reflections_plotted: shown.length
+    },
+    intensity_scale:"일치한 peak 중 계산 강도가 가장 큰 것을 100으로 두고 계산값과 실측값을 같은 기준으로 환산",
+    compared_peaks: rows.map(r=>({hkl:r.hkl, two_theta_sim:+r.tth.toFixed(3),
+      I_sim:r.is100===null? null : +r.is100.toFixed(1),
+      delta_two_theta: r.d===null? null : +r.d.toFixed(3),
+      I_exp: r.ie100===null? null : +r.ie100.toFixed(1),
+      I_ratio: r.ratio===null? null : +r.ratio.toFixed(2)})),
+    experimental_peaks: ep.slice().sort((a,b)=>b.relArea-a.relArea).slice(0,20).sort((a,b)=>a.tth-b.tth)
+        .map(p=>({two_theta:+p.tth.toFixed(3), area_rel:+p.relArea.toFixed(1),
+                  fwhm_deg: p.fwhm===null? null : +p.fwhm.toFixed(3)})),
+    position_match:{ tolerance_deg:tol, matched:hits, of:sp.length, rate_percent:+rate.toFixed(1),
+            mean_abs_delta_deg: hits? +(sumAbs/hits).toFixed(3): null },
+    intensity_match:{ pairs:pairs.length, reference_hkl: refRow? refRow.hkl : null,
+            R_I_percent: RI===null? null : +RI.toFixed(1),
+            pearson_r: pear===null? null : +pear.toFixed(3),
+            peaks_outside_0p67_to_1p5: off },
+    experimental_file: exp.name,
+    memo: $("memo").value.trim()||null
+  };
+  updatePayloadPreview();
+}
+function updatePayloadPreview(){
+  $("payloadPre").textContent = state.payload? JSON.stringify(state.payload,null,1) : "데이터를 불러오면 표시됩니다.";
+  $("btnComment").disabled = !(state.payload && $("cbApi").checked);
+}
+
+/* ---------------- simulation driver ---------------- */
+function currentLambda(){
+  const v=$("selWave").value;
+  return v==="custom"? (parseFloat($("waveCustom").value)||1.540598) : parseFloat(v);
+}
+async function runSimulations(){
+  const sims=state.traces.filter(t=>t.kind==="sim");
+  if(!sims.length){ $("simStatus").textContent=""; return; }
+  const lo=parseFloat($("tthMin").value), hi=parseFloat($("tthMax").value);
+  const lam=currentLambda();
+  const fw=Math.max(0.005,parseFloat($("fwhm").value)||0.12);
+  const eta=Math.min(1,Math.max(0,parseFloat($("eta").value)||0.5));
+  const B=Math.max(0,parseFloat($("bIso").value)||0);
+  const lp=$("cbLP").checked;
+  $("simStatus").className="statusline";
+  for(const t of sims){
+    $("simStatus").textContent=`계산 중 : ${t.name}`;
+    await new Promise(r=>setTimeout(r,15));
+    try{
+      const t0=performance.now();
+      const peaks=simulatePattern(t.meta.st,{lambda:lam,tthMin:lo,tthMax:hi,applyLP:lp,bDefault:B});
+      const step=Math.min(0.01, fw/6);
+      const prof=convolve(peaks,lo,hi,fw,eta,step);
+      t.peaks=peaks; t.x=prof.x; t.y=prof.y;
+      $("simStatus").textContent=`${t.name} : ${peaks.length}개 reflection, ${((performance.now()-t0)/1000).toFixed(1)} s`;
+    }catch(err){
+      $("simStatus").className="statusline err";
+      $("simStatus").textContent=`${t.name} 계산 실패 : ${err.message}`;
+    }
+  }
+  updateMatch(); draw();
+}
+
+/* ---------------- file loading ---------------- */
+function clearReview(){
+  /* 실험 데이터와 해석 결과만 폐기, 공개 자료인 CIF는 유지 */
+  state.traces=state.traces.filter(t=>t.kind!=="exp");
+  state.picks=[];
+  state.payload=null;
+  $("commentOut").textContent=""; $("apiStatus").textContent="";
+  $("memo").value="";
+  $("matchBox").innerHTML=""; renderPicks(); renderTraceList(); updatePayloadPreview();
+}
+function purgeAll(){
+  state.traces=[]; state.payload=null; state.picks=[];
+  $("commentOut").textContent=""; $("apiStatus").textContent="";
+  $("apiKey").value=""; $("memo").value="";
+  $("cbApi").checked=false;
+  ["apiKey","apiModel","memo"].forEach(id=>$(id).disabled=true);
+  renderTraceList(); updatePayloadPreview();
+  $("matchBox").innerHTML=""; renderPicks(); $("cifInfo").textContent="없음";
+  $("simStatus").textContent=""; draw();
+}
+function stamp(msg, err){
+  const el=$("loadStatus");
+  el.className = err? "statusline err":"statusline";
+  el.textContent = msg;
+}
+function readFiles(files){ return Promise.all([...files].map(f=>f.text().then(txt=>({name:f.name,txt})))); }
+
+$("fExp").addEventListener("change", async (e)=>{
+  const files=e.target.files; if(!files.length) return;
+  clearReview();
+  stamp("이전 실험 데이터와 comment 폐기됨 "+new Date().toLocaleTimeString()+" · 불러오는 중");
+  const list=await readFiles(files);
+  let ok=0, errs=[];
+  for(const f of list){
+    try{ const d=parseExpFile(f.name,f.txt);
+      addTrace({name:f.name, kind:"exp", x:d.x, y:d.y, color:PALETTE[0], meta:{n:d.x.length}});
+      ok++;
+    }catch(err){ errs.push(`${f.name} : ${err.message}`); }
+  }
+  renderTraceList();
+  stamp(`실험 데이터 ${ok}개 로드${errs.length? " · 실패 "+errs.join(" / "):""}`, errs.length>0);
+  const needSim=state.traces.some(t=>t.kind==="sim" && !t.peaks);
+  if(needSim) await runSimulations(); else { updateMatch(); draw(); }
+  e.target.value="";
+});
+
+$("fCif").addEventListener("change", async (e)=>{
+  const files=e.target.files; if(!files.length) return;
+  state.traces=state.traces.filter(t=>t.kind!=="sim");
+  const list=await readFiles(files);
+  const info=[]; let errs=[];
+  for(const f of list){
+    try{
+      const st=structureFromCIF(f.txt);
+      addTrace({name:f.name, kind:"sim", x:new Float64Array(0), y:new Float64Array(0),
+                color:PALETTE[1], peaks:null,
+                meta:{st, cell:st.cell, hm:st.hm, formula:st.formula, ccdc:st.ccdc}});
+      const c=st.cell;
+      info.push(`<div style="margin-bottom:6px"><b>${esc(f.name)}</b><br>
+        ${st.formula? esc(st.formula)+"<br>":""}
+        ${st.hm? "space group "+esc(st.hm)+"<br>":""}
+        a ${c.a.toFixed(4)} &nbsp; b ${c.b.toFixed(4)} &nbsp; c ${c.c.toFixed(4)} Å<br>
+        α ${c.al.toFixed(3)} &nbsp; β ${c.be.toFixed(3)} &nbsp; γ ${c.ga.toFixed(3)}°<br>
+        비대칭 단위 ${st.nSites} sites, 대칭연산 ${st.nOps}개, 단위포 내 ${st.atoms.length} atoms
+        ${st.ccdc? "<br>CCDC "+esc(st.ccdc) : ""}
+        ${st.symWarn? '<br><span style="color:#E4867F">'+st.symWarn+"</span>":""}
+        ${st.unknown.length? '<br><span style="color:#E4867F">인식하지 못한 원자 '+esc(st.unknown.join(", "))+"</span>":""}
+        </div>`);
+    }catch(err){ errs.push(`${f.name} : ${err.message}`); }
+  }
+  $("cifInfo").innerHTML = info.length? info.join("") : "없음";
+  renderTraceList();
+  stamp(`CIF ${info.length}개 로드${errs.length? " · 실패 "+errs.join(" / "):""}`, errs.length>0);
+  await runSimulations();
+  e.target.value="";
+});
+
+/* ---------------- controls ---------------- */
+["tthMin","tthMax"].forEach(id=>$(id).addEventListener("change",()=>{ runSimulations(); }));
+$("cbNorm").addEventListener("change",draw);
+$("rOff").addEventListener("input",()=>{ $("offVal").textContent=$("rOff").value+"%"; draw(); });
+$("cbYAuto").addEventListener("change",()=>{
+  const on=$("cbYAuto").checked; $("yMin").disabled=on; $("yMax").disabled=on; draw();
+});
+["yMin","yMax"].forEach(id=>$(id).addEventListener("change",draw));
+$("cbTicks").addEventListener("change",draw);
+$("cbLP").addEventListener("change",runSimulations);
+["fwhm","eta","bIso"].forEach(id=>$(id).addEventListener("change",runSimulations));
+$("selWave").addEventListener("change",()=>{
+  $("waveCustom").style.display = $("selWave").value==="custom"? "block":"none";
+  runSimulations();
+});
+$("waveCustom").addEventListener("change",runSimulations);
+$("btnSim").addEventListener("click",runSimulations);
+["tolMatch","nMatch"].forEach(id=>$(id).addEventListener("change",updateMatch));
+$("btnPurge").addEventListener("click",()=>{ purgeAll(); stamp("모든 데이터가 폐기되었습니다 "+new Date().toLocaleTimeString()); });
+window.addEventListener("resize",draw);
+
+$("btnPng").addEventListener("click",()=>{
+  const tmp=document.createElement("canvas");
+  tmp.width=cv.width; tmp.height=cv.height;
+  const c2=tmp.getContext("2d");
+  c2.fillStyle="#FFFFFF"; c2.fillRect(0,0,tmp.width,tmp.height);
+  c2.drawImage(cv,0,0);
+  const a=document.createElement("a");
+  a.download="xrd_compare.png"; a.href=tmp.toDataURL("image/png"); a.click();
+});
+$("btnCsv").addEventListener("click",()=>{
+  const sims=state.traces.filter(t=>t.kind==="sim"&&t.peaks);
+  if(!sims.length){ stamp("저장할 시뮬레이션 결과가 없습니다.",true); return; }
+  const lam=currentLambda();
+  let csv="file,h,k,l,two_theta_deg,d_A,rel_intensity\n";
+  for(const t of sims) for(const p of t.peaks){
+    const d=lam/(2*Math.sin(p.tth/2*Math.PI/180));
+    csv+=`${t.name},${p.h},${p.k},${p.l},${p.tth.toFixed(4)},${d.toFixed(5)},${p.rel.toFixed(2)}\n`;
+  }
+  const a=document.createElement("a");
+  a.download="simulated_peaks.csv";
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+
+/* ---------------- CCDC ---------------- */
+$("btnCcdc").addEventListener("click",()=>{
+  const p=new URLSearchParams();
+  const id=$("ccdcId").value.trim(), nm=$("ccdcName").value.trim(),
+        doi=$("ccdcDoi").value.trim(), au=$("ccdcAuth").value.trim();
+  if(id) p.set("Ccdcid",id);
+  if(nm) p.set("Compound",nm);
+  if(doi) p.set("Doi",doi);
+  if(au) p.set("Author",au);
+  p.set("DatabaseToSearch",$("ccdcDb").value);
+  window.open("https://www.ccdc.cam.ac.uk/structures/Search?"+p.toString(),"_blank","noopener");
+});
+$("btnCcdcHome").addEventListener("click",()=>{
+  window.open("https://www.ccdc.cam.ac.uk/structures/?ccdc-check=86df77a9063c6c0c5b6119fe3c228ed2","_blank","noopener");
+});
+
+/* ---------------- Claude API comment ---------------- */
+$("cbApi").addEventListener("change",()=>{
+  const on=$("cbApi").checked;
+  ["apiKey","apiModel","memo"].forEach(id=>$(id).disabled=!on);
+  if(!on){ $("apiKey").value=""; }
+  updatePayloadPreview();
+});
+$("memo").addEventListener("change",updateMatch);
+$("btnPickClear").addEventListener("click",()=>{ state.picks=[]; renderPicks(); draw(); });
+$("btnClearComment").addEventListener("click",()=>{ $("commentOut").textContent=""; $("apiStatus").textContent=""; });
+
+const SYSTEM_PROMPT = [
+  "당신은 MOF 합성과 분말 XRD 해석 경험이 많은 무기화학 연구자입니다.",
+  "입력으로 실험 분말 XRD의 peak 목록, CIF 기반 시뮬레이션 peak 목록, 두 목록의 일치 통계, 그리고 사용자가 적은 합성 조건 메모를 받습니다.",
+  "원본 회절 곡선 전체는 주어지지 않습니다. 주어진 값만으로 판단하고, 값이 없으면 없다고 명시하십시오.",
+  "강도 비교값은 일치한 peak 중 계산 강도가 가장 큰 것을 100으로 두고 실험 peak의 배경 보정 적분 면적과 시뮬레이션 적분 강도를 같은 기준으로 환산한 것입니다. 선호 배향, 결정성 차이, 입자 크기 때문에 흔들릴 수 있으므로 위치 일치보다 약한 근거로 다루십시오.",
+  "다음 순서로 한국어로 답하십시오.",
+  "1. 목표 상이 형성되었는지에 대한 판단과 그 근거 (일치한 peak, 일치하지 않은 peak, 2theta 이동 경향, 강도 비율의 계통적 편차).",
+  "2. 불일치가 있다면 가능한 원인 (미반응 전구체, 다른 상, 결정성 부족, 배향, 용매 잔류, 시료 높이 오차 등)과 각 원인을 구분할 방법.",
+  "3. 다음에 시도할 합성 조건 제안. 변경할 변수 하나와 그 범위를 구체적으로 제시하고 이유를 붙이십시오.",
+  "추측과 확인된 사실을 명확히 구분하고, 근거가 부족하면 단정하지 마십시오. 이모지를 쓰지 마십시오."
+].join("\n");
+
+$("btnComment").addEventListener("click", async ()=>{
+  if(!state.payload){ return; }
+  if(!$("cbApi").checked){ return; }
+  const key=$("apiKey").value.trim();
+  if(!key){ $("apiStatus").className="statusline err"; $("apiStatus").textContent="API key가 비어 있습니다."; return; }
+  const ok=window.confirm("아래 요약값을 Anthropic API로 전송합니다.\n\n"
+    +"전송 항목 : 격자 정보, 시뮬레이션 peak 목록, 실험 peak 목록, 일치 통계, 합성 조건 메모\n"
+    +"전송하지 않는 항목 : 실험 raw data 전체, 파일 자체\n\n계속하시겠습니까?");
+  if(!ok) return;
+  const btn=$("btnComment"); btn.disabled=true;
+  $("apiStatus").className="statusline"; $("apiStatus").textContent="요청 중";
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "content-type":"application/json",
+        "x-api-key":key,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body:JSON.stringify({
+        model:$("apiModel").value,
+        max_tokens:1500,
+        system:SYSTEM_PROMPT,
+        messages:[{role:"user",content:"다음은 한 번의 XRD 검증 결과입니다.\n\n"+JSON.stringify(state.payload,null,1)}]
+      })
+    });
+    if(!res.ok){
+      const t=await res.text();
+      throw new Error(res.status+" "+t.slice(0,300));
+    }
+    const data=await res.json();
+    const text=(data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n").trim();
+    $("commentOut").textContent = text || "응답에 텍스트가 없습니다.";
+    $("apiStatus").textContent="완료 "+new Date().toLocaleTimeString()+" · 응답은 이 브라우저 메모리에만 있습니다.";
+  }catch(err){
+    $("apiStatus").className="statusline err";
+    $("apiStatus").textContent="실패 : "+err.message;
+  }finally{
+    btn.disabled=false;
+  }
+});
+
+/* ---------------- boot ---------------- */
+renderTraceList(); renderPicks(); updatePayloadPreview(); draw();
+
+</script>
+</body>
+</html>
